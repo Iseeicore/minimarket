@@ -1,0 +1,622 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMPRESA Y CATÁLOGO BASE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Empresa {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  ruc       String?
+  direccion String?
+  telefono  String?
+  logoUrl   String?
+  creadoEn  DateTime @default(now())
+
+  almacenes Almacen[]
+  contactos Contacto[]
+  usuarios  Usuario[]
+
+  @@map("empresas")
+}
+
+model UnidadMedida {
+  id          Int    @id @default(autoincrement())
+  nombre      String
+  abreviatura String
+
+  variantes Variante[]
+
+  @@map("unidades_medida")
+}
+
+model Categoria {
+  id          Int       @id @default(autoincrement())
+  nombre      String
+  descripcion String?
+
+  productos Producto[]
+
+  @@map("categorias")
+}
+
+model Almacen {
+  id        Int     @id @default(autoincrement())
+  empresaId Int
+  nombre    String
+  direccion String?
+
+  empresa           Empresa            @relation(fields: [empresaId], references: [id])
+  stocks            StockAlmacen[]
+  cajas             Caja[]
+  ventas            Venta[]
+  ordenesCompra     OrdenCompra[]
+  movimientosStock  MovimientoStock[]
+  bitacora          Bitacora[]
+  usuarios          Usuario[]
+  resumenesDia      ResumenDia[]
+  registrosAlmacen  RegistroAlmacen[]
+  registrosTienda   RegistroTienda[]
+  sincronizaciones  Sincronizacion[]
+
+  @@map("almacenes")
+}
+
+model Producto {
+  id          Int     @id @default(autoincrement())
+  categoriaId Int
+  nombre      String
+  descripcion String?
+
+  categoria Categoria  @relation(fields: [categoriaId], references: [id])
+  variantes Variante[]
+
+  @@map("productos")
+}
+
+model Variante {
+  id          Int     @id @default(autoincrement())
+  productoId  Int
+  unidadId    Int
+  nombre      String
+  sku         String? @unique
+  costoBase   Decimal @default(0) @db.Decimal(10, 2)
+  precioVenta Decimal @default(0) @db.Decimal(10, 2)
+  stockMinimo Int     @default(0)
+  activo      Boolean @default(true)
+
+  producto           Producto            @relation(fields: [productoId], references: [id])
+  unidad             UnidadMedida        @relation(fields: [unidadId], references: [id])
+  stocks             StockAlmacen[]
+  itemsCompra        ItemCompra[]
+  itemsVenta         ItemVenta[]
+  movimientosStock   MovimientoStock[]
+  registrosAlmacen   RegistroAlmacen[]
+  registrosTienda    RegistroTienda[]
+  reconciliaciones   ReconciliacionItem[]
+
+  @@map("variantes")
+}
+
+model StockAlmacen {
+  id         Int @id @default(autoincrement())
+  almacenId  Int
+  varianteId Int
+  cantidad   Int @default(0)
+
+  almacen  Almacen  @relation(fields: [almacenId], references: [id])
+  variante Variante @relation(fields: [varianteId], references: [id])
+
+  @@unique([almacenId, varianteId])
+  @@map("stock_almacen")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONTACTOS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum TipoContacto {
+  CLIENTE
+  PROVEEDOR
+  AMBOS
+}
+
+model Contacto {
+  id        Int          @id @default(autoincrement())
+  empresaId Int
+  tipo      TipoContacto @default(CLIENTE)
+  nombre    String
+  tipoDoc   String?
+  nroDoc    String?
+  telefono  String?
+  email     String?
+  direccion String?
+  notas     String?
+  creadoEn  DateTime     @default(now())
+
+  empresa       Empresa       @relation(fields: [empresaId], references: [id])
+  ventas        Venta[]
+  ordenesCompra OrdenCompra[]
+
+  @@map("contactos")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPRAS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum EstadoCompra {
+  PENDIENTE
+  PARCIAL
+  PAGADO
+}
+
+model OrdenCompra {
+  id         Int          @id @default(autoincrement())
+  almacenId  Int
+  contactoId Int?
+  estado     EstadoCompra @default(PENDIENTE)
+  total      Decimal      @db.Decimal(10, 2)
+  notas      String?
+  recibidoEn DateTime?
+  creadoEn   DateTime     @default(now())
+
+  almacen  Almacen      @relation(fields: [almacenId], references: [id])
+  contacto Contacto?    @relation(fields: [contactoId], references: [id])
+  items    ItemCompra[]
+  pagos    PagoCompra[]
+
+  @@map("ordenes_compra")
+}
+
+model ItemCompra {
+  id            Int     @id @default(autoincrement())
+  ordenCompraId Int
+  varianteId    Int
+  cantidad      Int
+  costoUnitario Decimal @db.Decimal(10, 2)
+  subtotal      Decimal @db.Decimal(10, 2)
+
+  ordenCompra OrdenCompra @relation(fields: [ordenCompraId], references: [id])
+  variante    Variante    @relation(fields: [varianteId], references: [id])
+
+  @@map("items_compra")
+}
+
+model PagoCompra {
+  id            Int      @id @default(autoincrement())
+  ordenCompraId Int
+  monto         Decimal  @db.Decimal(10, 2)
+  pagadoEn      DateTime @default(now())
+  notas         String?
+
+  ordenCompra OrdenCompra @relation(fields: [ordenCompraId], references: [id])
+
+  @@map("pagos_compra")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAJA
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum EstadoCaja {
+  ABIERTA
+  CERRADA
+}
+
+model Caja {
+  id            Int        @id @default(autoincrement())
+  almacenId     Int
+  abiertoPor    Int
+  abiertoEn     DateTime   @default(now())
+  cerradoEn     DateTime?
+  montoApertura Decimal    @db.Decimal(10, 2)
+  montoCierre   Decimal?   @db.Decimal(10, 2)
+  estado        EstadoCaja @default(ABIERTA)
+
+  almacen     Almacen          @relation(fields: [almacenId], references: [id])
+  usuario     Usuario          @relation(fields: [abiertoPor], references: [id])
+  movimientos MovimientoCaja[]
+  ventas      Venta[]
+
+  @@map("cajas")
+}
+
+enum TipoMovCaja {
+  INGRESO
+  EGRESO
+  AJUSTE
+}
+
+model MovimientoCaja {
+  id             Int         @id @default(autoincrement())
+  cajaId         Int
+  tipo           TipoMovCaja
+  referenciaTipo String?
+  referenciaId   Int?
+  monto          Decimal     @db.Decimal(10, 2)
+  descripcion    String?
+  creadoEn       DateTime    @default(now())
+
+  caja Caja @relation(fields: [cajaId], references: [id])
+
+  @@map("movimientos_caja")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VENTAS Y NOTAS DE VENTA
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum EstadoVenta {
+  COMPLETADA
+  CANCELADA
+  DEVUELTA
+}
+
+enum TipoDescuento {
+  POR_UNIDAD
+  POR_TOTAL
+  NINGUNO
+}
+
+enum MetodoPago {
+  EFECTIVO
+  YAPE
+  TRANSFERENCIA
+  OTRO
+}
+
+// Serie fija por talonario — ej. "B001", "F001", "T001" — no incrementa
+// nroComprobante: 10 dígitos secuenciales — ej. "0000000001"
+// @@unique([serie, nroComprobante]) previene duplicados de comprobantes
+enum TipoComprobante {
+  TICKET
+  BOLETA
+  FACTURA
+}
+
+model Venta {
+  id              Int             @id @default(autoincrement())
+  almacenId       Int
+  cajaId          Int
+  contactoId      Int?
+  estado          EstadoVenta     @default(COMPLETADA)
+  metodoPago      MetodoPago      @default(EFECTIVO)
+  subtotal        Decimal         @db.Decimal(10, 2)
+  descuentoTotal  Decimal         @default(0) @db.Decimal(10, 2)
+  igv             Decimal         @default(0) @db.Decimal(10, 2)
+  total           Decimal         @db.Decimal(10, 2)
+  tipoComprobante TipoComprobante @default(TICKET)
+  serie           String?         // "B001" — fija por talonario
+  nroComprobante  String?         // "0000000001" — 10 dígitos
+  notas           String?
+  creadoEn        DateTime        @default(now())
+  creadoPor       Int
+
+  almacen      Almacen      @relation(fields: [almacenId], references: [id])
+  caja         Caja         @relation(fields: [cajaId], references: [id])
+  contacto     Contacto?    @relation(fields: [contactoId], references: [id])
+  creador      Usuario      @relation(fields: [creadoPor], references: [id])
+  items        ItemVenta[]
+  devoluciones Devolucion[]
+
+  @@unique([serie, nroComprobante])
+  @@map("ventas")
+}
+
+model ItemVenta {
+  id             Int           @id @default(autoincrement())
+  ventaId        Int
+  varianteId     Int
+  cantidad       Int
+  precioUnitario Decimal       @db.Decimal(10, 2)
+  tipoDescuento  TipoDescuento @default(NINGUNO)
+  valorDescuento Decimal       @default(0) @db.Decimal(10, 2)
+  subtotal       Decimal       @db.Decimal(10, 2)
+
+  venta           Venta            @relation(fields: [ventaId], references: [id])
+  variante        Variante         @relation(fields: [varianteId], references: [id])
+  itemsDevolucion ItemDevolucion[]
+
+  @@map("items_venta")
+}
+
+model Devolucion {
+  id           Int      @id @default(autoincrement())
+  ventaId      Int
+  procesadoPor Int
+  motivo       String?
+  notas        String?
+  creadoEn     DateTime @default(now())
+
+  venta   Venta           @relation(fields: [ventaId], references: [id])
+  usuario Usuario         @relation(fields: [procesadoPor], references: [id])
+  items   ItemDevolucion[]
+
+  @@map("devoluciones")
+}
+
+model ItemDevolucion {
+  id               Int           @id @default(autoincrement())
+  devolucionId     Int
+  itemVentaId      Int
+  cantidadDevuelta Int
+  tipoDescuento    TipoDescuento @default(NINGUNO)
+  valorDescuento   Decimal       @default(0) @db.Decimal(10, 2)
+  montoDevuelto    Decimal       @db.Decimal(10, 2)
+
+  devolucion Devolucion @relation(fields: [devolucionId], references: [id])
+  itemVenta  ItemVenta  @relation(fields: [itemVentaId], references: [id])
+
+  @@map("items_devolucion")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STOCK Y MOVIMIENTOS OFICIALES
+// ─────────────────────────────────────────────────────────────────────────────
+
+// TRANSFERENCIA_SALIDA: generado automáticamente cuando RegistroAlmacen
+// registra un tipo TRANSFERENCIA — es la única vez que el stock oficial
+// se mueve sin una Venta o Compra de por medio
+enum TipoMovStock {
+  COMPRA_ENTRADA
+  VENTA_SALIDA
+  DEVOLUCION_ENTRADA
+  AJUSTE
+  TRANSFERENCIA_SALIDA
+}
+
+model MovimientoStock {
+  id              Int          @id @default(autoincrement())
+  almacenId       Int
+  varianteId      Int
+  tipo            TipoMovStock
+  referenciaTipo  String?      // "VENTA", "COMPRA", "DEVOLUCION", "REGISTRO_ALMACEN"
+  referenciaId    Int?         // id del documento origen
+  cantidad        Int
+  cantidadAntes   Int
+  cantidadDespues Int
+  creadoEn        DateTime     @default(now())
+  creadoPor       Int
+
+  almacen  Almacen  @relation(fields: [almacenId], references: [id])
+  variante Variante @relation(fields: [varianteId], references: [id])
+  usuario  Usuario  @relation(fields: [creadoPor], references: [id])
+
+  @@map("movimientos_stock")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BITÁCORA Y RESÚMENES
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Bitacora {
+  id           Int      @id @default(autoincrement())
+  almacenId    Int
+  usuarioId    Int
+  contenido    String
+  registradoEn DateTime @default(now())
+
+  almacen Almacen @relation(fields: [almacenId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@map("bitacora")
+}
+
+model ResumenDia {
+  id                 Int      @id @default(autoincrement())
+  fecha              DateTime @db.Date
+  almacenId          Int
+  totalVentas        Int      @default(0)
+  montoTotal         Decimal  @default(0) @db.Decimal(10, 2)
+  montoPorEfectivo   Decimal  @default(0) @db.Decimal(10, 2)
+  montoPorYape       Decimal  @default(0) @db.Decimal(10, 2)
+  montoTransferencia Decimal  @default(0) @db.Decimal(10, 2)
+  montoOtro          Decimal  @default(0) @db.Decimal(10, 2)
+  totalDevoluciones  Decimal  @default(0) @db.Decimal(10, 2)
+  creadoEn           DateTime @default(now())
+
+  almacen Almacen @relation(fields: [almacenId], references: [id])
+
+  @@unique([fecha, almacenId])
+  @@map("resumenes_dia")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CUADERNOS VIRTUALES — REGISTROS MANUALES
+// ─────────────────────────────────────────────────────────────────────────────
+
+// SALIDA      → algo salió (normal: producto fue a tienda)
+// ENTRADA     → algo entró (devolución, reposición)
+// TRANSFERENCIA → salida directa sin contrapartida en tienda
+//                genera MovimientoStock tipo TRANSFERENCIA_SALIDA automáticamente
+enum TipoMovRegistro {
+  SALIDA
+  ENTRADA
+  TRANSFERENCIA
+}
+
+// Cuaderno del JEFE_ALMACEN
+// Se crea automáticamente cuando JEFE_ALMACEN guarda una Nota de Venta,
+// o manualmente para entradas, salidas y transferencias directas
+model RegistroAlmacen {
+  id         Int             @id @default(autoincrement())
+  almacenId  Int
+  varianteId Int
+  cantidad   Int
+  tipo       TipoMovRegistro
+  notas      String?
+  creadoPor  Int
+  creadoEn   DateTime        @default(now())
+
+  almacen  Almacen  @relation(fields: [almacenId], references: [id])
+  variante Variante @relation(fields: [varianteId], references: [id])
+  usuario  Usuario  @relation(fields: [creadoPor], references: [id])
+
+  @@map("registros_almacen")
+}
+
+// Cuaderno del JEFE_VENTA
+// Entrada manual: selecciona producto + cantidad
+// No requiere Nota de Venta vinculada — es un apunte libre
+model RegistroTienda {
+  id         Int             @id @default(autoincrement())
+  almacenId  Int
+  varianteId Int
+  cantidad   Int
+  tipo       TipoMovRegistro
+  notas      String?
+  creadoPor  Int
+  creadoEn   DateTime        @default(now())
+
+  almacen  Almacen  @relation(fields: [almacenId], references: [id])
+  variante Variante @relation(fields: [varianteId], references: [id])
+  usuario  Usuario  @relation(fields: [creadoPor], references: [id])
+
+  @@map("registros_tienda")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SINCRONIZACIÓN Y RECONCILIACIÓN
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum TipoSincronizacion {
+  MANUAL
+  CIERRE_DIA
+  PROGRAMADA
+}
+
+enum EstadoSincronizacion {
+  PENDIENTE
+  EN_PROCESO
+  COMPLETADA
+  CON_DIFERENCIAS
+}
+
+// Ejecutada solo por JEFE_VENTA o ADMIN
+// Compara RegistroAlmacen vs RegistroTienda en un período dado
+model Sincronizacion {
+  id                 Int                  @id @default(autoincrement())
+  almacenId          Int
+  tipo               TipoSincronizacion
+  estado             EstadoSincronizacion @default(PENDIENTE)
+  periodoDesde       DateTime
+  periodoHasta       DateTime
+  totalCoincidencias Int                  @default(0)
+  totalDiferencias   Int                  @default(0)
+  ejecutadoPor       Int
+  creadoEn           DateTime             @default(now())
+  completadoEn       DateTime?
+
+  almacen        Almacen              @relation(fields: [almacenId], references: [id])
+  ejecutor       Usuario              @relation(fields: [ejecutadoPor], references: [id])
+  reconciliacion ReconciliacionItem[]
+
+  @@map("sincronizaciones")
+}
+
+// diferencia = cantidadAlmacen - cantidadTienda
+// Puede ser negativa si tienda registró más que almacén
+// Cada fila es el historial de una variante en una corrida de sync
+enum EstadoReconciliacion {
+  COINCIDE
+  DIFERENCIA
+  SIN_CONTRAPARTIDA   // transferencia directa sin registro en tienda
+  PENDIENTE_REVISION
+  RESUELTO
+}
+
+model ReconciliacionItem {
+  id               Int                  @id @default(autoincrement())
+  sincronizacionId Int
+  varianteId       Int
+  cantidadAlmacen  Int
+  cantidadTienda   Int
+  diferencia       Int                  // almacen - tienda — puede ser negativo
+  estado           EstadoReconciliacion @default(PENDIENTE_REVISION)
+  notas            String?
+  resueltoPor      Int?
+  resueltoEn       DateTime?
+
+  sincronizacion Sincronizacion @relation(fields: [sincronizacionId], references: [id])
+  variante       Variante       @relation(fields: [varianteId], references: [id])
+  resolvedor     Usuario?       @relation(fields: [resueltoPor], references: [id])
+
+  @@map("reconciliacion_items")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROLES, PERMISOS Y USUARIOS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum RolUsuario {
+  ADMIN
+  JEFE_VENTA    // maneja tienda — puede ejecutar sincronización
+  JEFE_ALMACEN  // maneja almacén — crea notas de venta y registros
+  ALMACENERO    // operativo — acceso según permisos asignados
+}
+
+enum ModuloApp {
+  VENTAS
+  COMPRAS
+  CAJA
+  DEVOLUCIONES
+  STOCK
+  PRODUCTOS
+  VARIANTES
+  CONTACTOS
+  BITACORA
+  DASHBOARD
+  REGISTRO_ALMACEN
+  REGISTRO_TIENDA
+  SINCRONIZACION
+}
+
+model Usuario {
+  id           Int        @id @default(autoincrement())
+  empresaId    Int
+  almacenId    Int?
+  nombre       String
+  email        String     @unique
+  passwordHash String
+  rol          RolUsuario @default(ALMACENERO)
+  activo       Boolean    @default(true)
+  creadoEn     DateTime   @default(now())
+
+  empresa                    Empresa              @relation(fields: [empresaId], references: [id])
+  almacen                    Almacen?             @relation(fields: [almacenId], references: [id])
+  cajasAbiertas              Caja[]
+  ventasCreadas              Venta[]
+  devolucionesProcesadas     Devolucion[]
+  movimientosStock           MovimientoStock[]
+  bitacora                   Bitacora[]
+  permisos                   PermisoUsuario[]
+  registrosAlmacen           RegistroAlmacen[]
+  registrosTienda            RegistroTienda[]
+  sincronizacionesEjecutadas Sincronizacion[]
+  reconciliacionesResueltas  ReconciliacionItem[]
+
+  @@map("usuarios")
+}
+
+model PermisoUsuario {
+  id        Int       @id @default(autoincrement())
+  usuarioId Int
+  modulo    ModuloApp
+  leer      Boolean   @default(false)
+  crear     Boolean   @default(false)
+  editar    Boolean   @default(false)
+  eliminar  Boolean   @default(false)
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@unique([usuarioId, modulo])
+  @@map("permisos_usuario")
+}

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.prisma.io)",
+      "mcp__plugin_engram_engram__mem_save"
+    ]
+  }
+}
