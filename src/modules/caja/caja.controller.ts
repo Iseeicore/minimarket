@@ -1,12 +1,5 @@
 import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  ParseIntPipe,
-  Post,
-  Request,
-  UseGuards,
+  Body, Controller, Get, Param, ParseIntPipe, Post, Request, UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ModuloApp } from '@prisma/client';
@@ -28,59 +21,56 @@ export class CajaController {
   @Get()
   @UseGuards(PermisosGuard)
   @Permiso(ModuloApp.CAJA, 'leer')
-  @ApiOperation({ summary: 'Listar todas las cajas (ADMIN o permiso CAJA→leer)' })
-  findAll() {
-    return this.service.findAll();
+  @ApiOperation({ summary: 'Listar cajas de la empresa' })
+  findAll(@Request() req: any) {
+    return this.service.findAll(req.user.empresaId);
   }
 
   @Get('activa/:almacenId')
   @UseGuards(PermisosGuard)
   @Permiso(ModuloApp.CAJA, 'leer')
-  @ApiOperation({ summary: 'Obtener la caja activa de un almacén (ADMIN o permiso CAJA→leer)' })
-  getActiva(@Param('almacenId', ParseIntPipe) almacenId: number) {
-    return this.service.getActiva(almacenId);
+  @ApiOperation({ summary: 'Caja activa de un almacén' })
+  getActiva(@Param('almacenId', ParseIntPipe) almacenId: number, @Request() req: any) {
+    return this.service.getActiva(almacenId, req.user.empresaId);
   }
 
   @Get(':id')
   @UseGuards(PermisosGuard)
   @Permiso(ModuloApp.CAJA, 'leer')
-  @ApiOperation({ summary: 'Obtener caja por ID con sus movimientos (ADMIN o permiso CAJA→leer)' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.service.findOne(id);
+  @ApiOperation({ summary: 'Obtener caja por ID con movimientos' })
+  findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.service.findOne(id, req.user.empresaId);
   }
 
   @Get(':id/movimientos')
   @UseGuards(PermisosGuard)
   @Permiso(ModuloApp.CAJA, 'leer')
-  @ApiOperation({ summary: 'Listar movimientos de una caja (ADMIN o permiso CAJA→leer)' })
-  getMovimientos(@Param('id', ParseIntPipe) id: number) {
-    return this.service.getMovimientos(id);
+  @ApiOperation({ summary: 'Movimientos de una caja' })
+  getMovimientos(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.service.getMovimientos(id, req.user.empresaId);
   }
 
   @Post('abrir')
   @UseGuards(PermisosGuard)
   @Permiso(ModuloApp.CAJA, 'crear')
-  @ApiOperation({ summary: 'Abrir una nueva caja (ADMIN o permiso CAJA→crear)' })
+  @ApiOperation({ summary: 'Abrir nueva caja' })
   abrir(@Body() dto: AbrirCajaDto, @Request() req: any) {
-    return this.service.abrir(dto, req.user.id);
+    return this.service.abrir(dto, req.user.id, req.user.empresaId);
   }
 
   @Post(':id/cerrar')
   @UseGuards(PermisosGuard)
   @Permiso(ModuloApp.CAJA, 'crear')
-  @ApiOperation({ summary: 'Cerrar caja e ingresar monto físico contado (ADMIN o permiso CAJA→crear)' })
-  cerrar(@Param('id', ParseIntPipe) id: number, @Body() dto: CerrarCajaDto) {
-    return this.service.cerrar(id, dto);
+  @ApiOperation({ summary: 'Cerrar caja y generar resumen del día' })
+  cerrar(@Param('id', ParseIntPipe) id: number, @Body() dto: CerrarCajaDto, @Request() req: any) {
+    return this.service.cerrar(id, dto, req.user.empresaId);
   }
 
   @Post(':id/movimientos')
   @UseGuards(PermisosGuard)
   @Permiso(ModuloApp.CAJA, 'crear')
-  @ApiOperation({ summary: 'Registrar movimiento manual en caja (ADMIN o permiso CAJA→crear)' })
-  addMovimiento(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: CreateMovimientoCajaDto,
-  ) {
-    return this.service.addMovimiento(id, dto);
+  @ApiOperation({ summary: 'Registrar movimiento manual en caja' })
+  addMovimiento(@Param('id', ParseIntPipe) id: number, @Body() dto: CreateMovimientoCajaDto, @Request() req: any) {
+    return this.service.addMovimiento(id, dto, req.user.empresaId);
   }
 }

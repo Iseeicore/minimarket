@@ -1,8 +1,9 @@
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ModuloApp } from '@prisma/client';
+import { ModuloApp, RolUsuario } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AccionPermiso, PERMISO_KEY } from '../decorators/permiso.decorator';
+import { PERMISOS_DEFAULT } from '../constants/permisos-default';
 
 @Injectable()
 export class PermisosGuard implements CanActivate {
@@ -25,13 +26,20 @@ export class PermisosGuard implements CanActivate {
     // ADMIN siempre tiene acceso total
     if (user.rol === 'ADMIN') return true;
 
-    // ALMACENERO → verificar permiso específico en DB
+    // 1º — buscar permiso explícito en DB (el admin puede haber personalizado)
     const registro = await this.prisma.permisoUsuario.findUnique({
       where: {
         usuarioId_modulo: { usuarioId: user.id, modulo: permiso.modulo },
       },
     });
 
-    return registro?.[permiso.accion] === true;
+    if (registro) return registro[permiso.accion] === true;
+
+    // 2º — sin registro en DB → usar PERMISOS_DEFAULT del rol como fallback
+    const defaults = PERMISOS_DEFAULT[user.rol as RolUsuario];
+    if (!defaults) return false;
+
+    const moduloDefault = defaults.find((d) => d.modulo === permiso.modulo);
+    return moduloDefault?.[permiso.accion] === true;
   }
 }

@@ -7,21 +7,22 @@ import { paginate } from '../../common/utils/paginate';
 export class StockService {
   constructor(private prisma: PrismaService) {}
 
-  findAll() {
+  findAll(empresaId: number) {
     return this.prisma.stockAlmacen.findMany({
+      where:   { almacen: { empresaId } },
       include: {
-        almacen: true,
+        almacen:  { select: { id: true, nombre: true } },
         variante: { include: { producto: true, unidad: true } },
       },
       orderBy: { almacenId: 'asc' },
     });
   }
 
-  async findOne(id: number) {
-    const stock = await this.prisma.stockAlmacen.findUnique({
-      where: { id },
+  async findOne(id: number, empresaId: number) {
+    const stock = await this.prisma.stockAlmacen.findFirst({
+      where:   { id, almacen: { empresaId } },
       include: {
-        almacen: true,
+        almacen:  { select: { id: true, nombre: true } },
         variante: { include: { producto: true, unidad: true } },
       },
     });
@@ -29,28 +30,29 @@ export class StockService {
     return stock;
   }
 
-  findByAlmacen(almacenId: number) {
+  findByAlmacen(almacenId: number, empresaId: number) {
     return this.prisma.stockAlmacen.findMany({
-      where: { almacenId },
-      include: {
-        variante: { include: { producto: true, unidad: true } },
-      },
+      where:   { almacenId, almacen: { empresaId } },
+      include: { variante: { include: { producto: true, unidad: true } } },
       orderBy: { variante: { nombre: 'asc' } },
     });
   }
 
-  async findMovimientos({ page = 1, limit = 20 }: PaginationDto, almacenId?: number) {
+  async findMovimientos({ page = 1, limit = 20 }: PaginationDto, empresaId: number, almacenId?: number) {
     const skip  = (page - 1) * limit;
-    const where = almacenId ? { almacenId } : undefined;
+    const where = {
+      almacen: { empresaId },
+      ...(almacenId && { almacenId }),
+    };
     const [data, total] = await Promise.all([
       this.prisma.movimientoStock.findMany({
         where,
         skip,
-        take: limit,
+        take:    limit,
         include: {
-          almacen: true,
+          almacen:  { select: { id: true, nombre: true } },
           variante: { include: { producto: true } },
-          usuario: { select: { id: true, nombre: true } },
+          usuario:  { select: { id: true, nombre: true } },
         },
         orderBy: { creadoEn: 'desc' },
       }),

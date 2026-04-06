@@ -8,21 +8,18 @@ import { paginate } from '../../common/utils/paginate';
 export class BitacoraService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll({ page = 1, limit = 20 }: PaginationDto, almacenId?: number) {
+  async findAll({ page = 1, limit = 20 }: PaginationDto, empresaId: number, almacenId?: number) {
     const skip  = (page - 1) * limit;
-    const where = almacenId ? { almacenId } : undefined;
+    const where = {
+      almacen: { empresaId },
+      ...(almacenId && { almacenId }),
+    };
     const include = {
-      almacen: true,
+      almacen: { select: { id: true, nombre: true } },
       usuario: { select: { id: true, nombre: true, rol: true } },
     };
     const [data, total] = await Promise.all([
-      this.prisma.bitacora.findMany({
-        where,
-        skip,
-        take: limit,
-        include,
-        orderBy: { registradoEn: 'desc' },
-      }),
+      this.prisma.bitacora.findMany({ where, skip, take: limit, include, orderBy: { registradoEn: 'desc' } }),
       this.prisma.bitacora.count({ where }),
     ]);
     return paginate(data, total, page, limit);
@@ -30,13 +27,9 @@ export class BitacoraService {
 
   create(dto: CreateBitacoraDto, usuarioId: number) {
     return this.prisma.bitacora.create({
-      data: {
-        almacenId: dto.almacenId,
-        usuarioId,
-        contenido: dto.contenido,
-      },
+      data:    { almacenId: dto.almacenId, usuarioId, contenido: dto.contenido },
       include: {
-        almacen: true,
+        almacen: { select: { id: true, nombre: true } },
         usuario: { select: { id: true, nombre: true, rol: true } },
       },
     });

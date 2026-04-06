@@ -54,6 +54,12 @@ export class UsuariosController {
     return this.service.update(id, dto, req.user.empresaId);
   }
 
+  @Post('repair-permisos')
+  @ApiOperation({ summary: 'Siembra permisos faltantes para JEFE_ALMACEN/JEFE_VENTA sin permisos (ADMIN)' })
+  repararPermisos(@Request() req: any) {
+    return this.service.repararPermisos(req.user.empresaId);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Desactivar usuario — soft delete (ADMIN)' })
   remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {

@@ -1,11 +1,7 @@
-import { IsString, IsInt, IsOptional, MaxLength } from 'class-validator';
+import { IsString, IsOptional, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateAlmacenDto {
-  @ApiProperty({ example: 1 })
-  @IsInt()
-  empresaId: number;
-
   @ApiProperty({ example: 'Almacén Principal' })
   @IsString()
   @MaxLength(100)

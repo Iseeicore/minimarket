@@ -7,6 +7,8 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
+import { PERMISOS_DEFAULT } from '../../common/constants/permisos-default';
+import { RolUsuario } from '@prisma/client';
 
 const SELECT_USUARIO = {
   id: true,
@@ -51,21 +53,34 @@ export class UsuariosService {
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
-    return this.prisma.usuario.create({
-      data: {
-        empresaId,
-        almacenId: dto.almacenId,
-        nombre: dto.nombre,
-        email: dto.email,
-        passwordHash,
-        rol: dto.rol,
-      },
-      select: SELECT_USUARIO,
+    return this.prisma.$transaction(async (tx) => {
+      const usuario = await tx.usuario.create({
+        data: {
+          empresaId,
+          almacenId: dto.almacenId,
+          nombre:    dto.nombre,
+          email:     dto.email,
+          passwordHash,
+          rol:       dto.rol,
+        },
+        select: SELECT_USUARIO,
+      });
+
+      // Auto-seedear permisos según rol (JEFE_ALMACEN, JEFE_VENTA)
+      const defaults = PERMISOS_DEFAULT[dto.rol];
+      if (defaults?.length) {
+        await tx.permisoUsuario.createMany({
+          data: defaults.map((p) => ({ ...p, usuarioId: usuario.id })),
+          skipDuplicates: true,
+        });
+      }
+
+      return usuario;
     });
   }
 
   async update(id: number, dto: UpdateUsuarioDto, empresaId: number) {
-    await this.findOne(id, empresaId);
+    const usuario = await this.findOne(id, empresaId);
 
     const data: Record<string, unknown> = {
       nombre: dto.nombre,
@@ -81,11 +96,59 @@ export class UsuariosService {
     // Eliminar undefined para no sobreescribir con null
     Object.keys(data).forEach((k) => data[k] === undefined && delete data[k]);
 
-    return this.prisma.usuario.update({
-      where: { id },
-      data,
-      select: SELECT_USUARIO,
+    // Si se actualiza el rol (o se re-guarda el mismo), re-sincronizar permisos
+    // al PERMISOS_DEFAULT actual para ese rol. Esto corrige permisos desactualizados.
+    const rolDestino = (dto.rol ?? usuario.rol) as RolUsuario;
+    const defaults   = PERMISOS_DEFAULT[rolDestino];
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.usuario.update({
+        where: { id },
+        data,
+        select: SELECT_USUARIO,
+      });
+
+      if (defaults?.length) {
+        // Eliminar todos los permisos existentes y re-crear con los defaults actuales.
+        // Si el ADMIN necesita permisos customizados, los asigna aparte.
+        await tx.permisoUsuario.deleteMany({ where: { usuarioId: id } });
+        await tx.permisoUsuario.createMany({
+          data: defaults.map((p) => ({ ...p, usuarioId: id })),
+        });
+      }
+
+      return updated;
     });
+  }
+
+  /**
+   * Siembra permisos faltantes para todos los JEFE_ALMACEN / JEFE_VENTA de la empresa
+   * que no tengan ningún permiso registrado. Idempotente — usa skipDuplicates.
+   * Devuelve cuántos usuarios fueron reparados.
+   */
+  async repararPermisos(empresaId: number): Promise<{ reparados: number }> {
+    const usuarios = await this.prisma.usuario.findMany({
+      where: {
+        empresaId,
+        rol: { in: ['JEFE_ALMACEN', 'JEFE_VENTA'] },
+        activo: true,
+      },
+      select: { id: true, rol: true, _count: { select: { permisos: true } } },
+    });
+
+    let reparados = 0;
+    for (const u of usuarios) {
+      if (u._count.permisos > 0) continue;
+      const defaults = PERMISOS_DEFAULT[u.rol as RolUsuario];
+      if (!defaults?.length) continue;
+      await this.prisma.permisoUsuario.createMany({
+        data: defaults.map((p) => ({ ...p, usuarioId: u.id })),
+        skipDuplicates: true,
+      });
+      reparados++;
+    }
+
+    return { reparados };
   }
 
   async remove(id: number, empresaId: number) {

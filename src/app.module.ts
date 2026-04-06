@@ -20,14 +20,19 @@ import { BitacoraModule } from './modules/bitacora/bitacora.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
 import { PermisosModule } from './modules/permisos/permisos.module';
+import { RegistrosAlmacenModule } from './modules/registros-almacen/registros-almacen.module';
+import { RegistrosTiendaModule } from './modules/registros-tienda/registros-tienda.module';
+import { SincronizacionModule } from './modules/sincronizacion/sincronizacion.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([
-      { name: 'almacenero', ttl: 180_000, limit: 300 }, // 300 req / 3 min — mostrador activo
-      { name: 'admin',      ttl: 180_000, limit: 100 }, // 100 req / 3 min — uso administrativo
-      { name: 'publico',    ttl:  60_000, limit: 10  }, // 10 req / 1 min  — login y register
+      { name: 'almacenero',   ttl: 180_000, limit: 300 }, // 300 req / 3 min — mostrador activo
+      { name: 'admin',        ttl: 180_000, limit: 100 }, // 100 req / 3 min — uso administrativo
+      { name: 'jefe_venta',   ttl: 180_000, limit: 200 }, // 200 req / 3 min — tienda activa
+      { name: 'jefe_almacen', ttl: 180_000, limit: 200 }, // 200 req / 3 min — almacén activo
+      { name: 'publico',      ttl:  60_000, limit: 10  }, // 10 req / 1 min  — login y register
     ]),
     PrismaModule,
     AuthModule,
@@ -46,6 +51,9 @@ import { PermisosModule } from './modules/permisos/permisos.module';
     DashboardModule,
     UsuariosModule,
     PermisosModule,
+    RegistrosAlmacenModule,
+    RegistrosTiendaModule,
+    SincronizacionModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: RoleThrottlerGuard },

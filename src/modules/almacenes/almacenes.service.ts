@@ -7,33 +7,34 @@ import { UpdateAlmacenDto } from './dto/update-almacen.dto';
 export class AlmacenesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll() {
+  findAll(empresaId: number) {
     return this.prisma.almacen.findMany({
+      where:   { empresaId },
       include: { empresa: { select: { nombre: true } } },
       orderBy: { nombre: 'asc' },
     });
   }
 
-  async findOne(id: number) {
-    const almacen = await this.prisma.almacen.findUnique({
-      where: { id },
+  async findOne(id: number, empresaId: number) {
+    const almacen = await this.prisma.almacen.findFirst({
+      where:   { id, empresaId },
       include: { empresa: { select: { nombre: true } } },
     });
     if (!almacen) throw new NotFoundException(`Almacén #${id} no encontrado`);
     return almacen;
   }
 
-  create(dto: CreateAlmacenDto) {
-    return this.prisma.almacen.create({ data: dto });
+  create(dto: CreateAlmacenDto, empresaId: number) {
+    return this.prisma.almacen.create({ data: { ...dto, empresaId } });
   }
 
-  async update(id: number, dto: UpdateAlmacenDto) {
-    await this.findOne(id);
+  async update(id: number, dto: UpdateAlmacenDto, empresaId: number) {
+    await this.findOne(id, empresaId);
     return this.prisma.almacen.update({ where: { id }, data: dto });
   }
 
-  async remove(id: number) {
-    await this.findOne(id);
+  async remove(id: number, empresaId: number) {
+    await this.findOne(id, empresaId);
     return this.prisma.almacen.delete({ where: { id } });
   }
 }

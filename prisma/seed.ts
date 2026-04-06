@@ -29,10 +29,10 @@ async function main() {
   // Categorías
   await prisma.categoria.createMany({
     data: [
-      { nombre: 'Bebidas' },
-      { nombre: 'Lácteos' },
-      { nombre: 'Snacks' },
-      { nombre: 'Limpieza' },
+      { nombre: 'Bebidas',  empresaId: empresa.id },
+      { nombre: 'Lácteos',  empresaId: empresa.id },
+      { nombre: 'Snacks',   empresaId: empresa.id },
+      { nombre: 'Limpieza', empresaId: empresa.id },
     ],
     skipDuplicates: true,
   });

@@ -1,13 +1,5 @@
 import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  ParseIntPipe,
-  Post,
-  Query,
-  Request,
-  UseGuards,
+  Body, Controller, Get, Post, Query, Request, UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -26,10 +18,11 @@ export class BitacoraController {
   @ApiOperation({ summary: 'Listar bitácora paginada — ?almacenId= para filtrar' })
   @ApiQuery({ name: 'almacenId', required: false, type: Number })
   findAll(
+    @Request() req: any,
     @Query() pagination: PaginationDto,
     @Query('almacenId') almacenId?: string,
   ) {
-    return this.service.findAll(pagination, almacenId ? Number(almacenId) : undefined);
+    return this.service.findAll(pagination, req.user.empresaId, almacenId ? Number(almacenId) : undefined);
   }
 
   @Post()

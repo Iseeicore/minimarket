@@ -11,12 +11,12 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ModuloApp } from '@prisma/client';
-import { PaginationDto } from '../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermisosGuard } from '../../common/guards/permisos.guard';
 import { Permiso } from '../../common/decorators/permiso.decorator';
 import { VentasService } from './ventas.service';
 import { CreateVentaDto } from './dto/create-venta.dto';
+import { FilterVentaDto } from './dto/filter-venta.dto';
 
 @ApiTags('ventas')
 @ApiBearerAuth()
@@ -28,32 +28,32 @@ export class VentasController {
   @Get()
   @UseGuards(PermisosGuard)
   @Permiso(ModuloApp.VENTAS, 'leer')
-  @ApiOperation({ summary: 'Listar ventas paginadas (ADMIN o permiso VENTAS→leer)' })
-  findAll(@Query() pagination: PaginationDto) {
-    return this.service.findAll(pagination);
+  @ApiOperation({ summary: 'Listar ventas paginadas con filtros' })
+  findAll(@Query() filters: FilterVentaDto, @Request() req: any) {
+    return this.service.findAll(filters, req.user.empresaId);
   }
 
   @Get('hoy')
   @UseGuards(PermisosGuard)
   @Permiso(ModuloApp.VENTAS, 'leer')
-  @ApiOperation({ summary: 'Ventas del día actual (ADMIN o permiso VENTAS→leer)' })
-  findHoy() {
-    return this.service.findHoy();
+  @ApiOperation({ summary: 'Ventas del día actual (lista del día)' })
+  findHoy(@Request() req: any) {
+    return this.service.findHoy(req.user.empresaId);
   }
 
   @Get(':id')
   @UseGuards(PermisosGuard)
   @Permiso(ModuloApp.VENTAS, 'leer')
-  @ApiOperation({ summary: 'Obtener venta por ID con items y devoluciones (ADMIN o permiso VENTAS→leer)' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.service.findOne(id);
+  @ApiOperation({ summary: 'Obtener venta por ID con items y devoluciones' })
+  findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.service.findOne(id, req.user.empresaId);
   }
 
   @Post()
   @UseGuards(PermisosGuard)
   @Permiso(ModuloApp.VENTAS, 'crear')
-  @ApiOperation({ summary: 'Registrar nueva venta (ADMIN o permiso VENTAS→crear)' })
+  @ApiOperation({ summary: 'Registrar nueva venta' })
   create(@Body() dto: CreateVentaDto, @Request() req: any) {
-    return this.service.create(dto, req.user.id);
+    return this.service.create(dto, req.user.id, req.user.empresaId, req.user.rol);
   }
 }

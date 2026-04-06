@@ -6,11 +6,13 @@ import {
   IsNumber,
   IsOptional,
   IsPositive,
+  IsString,
+  Matches,
   Min,
   ValidateNested,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
-import { MetodoPago, TipoDescuento } from '@prisma/client';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { MetodoPago, TipoComprobante, TipoDescuento } from '@prisma/client';
 
 export class CreateItemVentaDto {
   @ApiProperty({ example: 1 })
@@ -56,6 +58,30 @@ export class CreateVentaDto {
   @ApiProperty({ enum: MetodoPago, default: MetodoPago.EFECTIVO })
   @IsEnum(MetodoPago)
   metodoPago: MetodoPago;
+
+  @ApiPropertyOptional({ enum: TipoComprobante, default: TipoComprobante.TICKET })
+  @IsOptional()
+  @IsEnum(TipoComprobante)
+  tipoComprobante?: TipoComprobante;
+
+  // Serie fija del talonario — ej. "B001", "F001". Requerida si tipoComprobante != TICKET
+  @ApiPropertyOptional({ example: 'B001' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Z]\d{3}$/, { message: 'serie debe tener formato A000 (ej. B001, F001)' })
+  serie?: string;
+
+  // 10 dígitos secuenciales — ej. "0000000001"
+  @ApiPropertyOptional({ example: '0000000001' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{10}$/, { message: 'nroComprobante debe tener exactamente 10 dígitos' })
+  nroComprobante?: string;
+
+  @ApiPropertyOptional({ example: 'Cliente pidió boleta para reembolso' })
+  @IsOptional()
+  @IsString()
+  notas?: string;
 
   @ApiProperty({ type: [CreateItemVentaDto] })
   @IsArray()

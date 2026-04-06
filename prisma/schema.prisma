@@ -20,9 +20,11 @@ model Empresa {
   logoUrl   String?
   creadoEn  DateTime @default(now())
 
-  almacenes Almacen[]
-  contactos Contacto[]
-  usuarios  Usuario[]
+  almacenes  Almacen[]
+  contactos  Contacto[]
+  usuarios   Usuario[]
+  categorias Categoria[]
+  productos  Producto[]
 
   @@map("empresas")
 }
@@ -39,9 +41,11 @@ model UnidadMedida {
 
 model Categoria {
   id          Int       @id @default(autoincrement())
+  empresaId   Int
   nombre      String
   descripcion String?
 
+  empresa   Empresa    @relation(fields: [empresaId], references: [id])
   productos Producto[]
 
   @@map("categorias")
@@ -71,10 +75,12 @@ model Almacen {
 
 model Producto {
   id          Int     @id @default(autoincrement())
+  empresaId   Int
   categoriaId Int
   nombre      String
   descripcion String?
 
+  empresa   Empresa    @relation(fields: [empresaId], references: [id])
   categoria Categoria  @relation(fields: [categoriaId], references: [id])
   variantes Variante[]
 
@@ -304,8 +310,9 @@ model Venta {
   caja         Caja         @relation(fields: [cajaId], references: [id])
   contacto     Contacto?    @relation(fields: [contactoId], references: [id])
   creador      Usuario      @relation(fields: [creadoPor], references: [id])
-  items        ItemVenta[]
-  devoluciones Devolucion[]
+  items            ItemVenta[]
+  devoluciones     Devolucion[]
+  registrosAlmacen RegistroAlmacen[]
 
   @@unique([serie, nroComprobante])
   @@map("ventas")
@@ -441,37 +448,43 @@ enum TipoMovRegistro {
   SALIDA
   ENTRADA
   TRANSFERENCIA
+  DEVOLUCION
 }
 
 // Cuaderno del JEFE_ALMACEN
 // Se crea automáticamente cuando JEFE_ALMACEN guarda una Nota de Venta,
-// o manualmente para entradas, salidas y transferencias directas
+// o manualmente para entradas, salidas y transferencias directas.
+// devuelto: true → la entrada fue anulada; la sincronización la omite.
 model RegistroAlmacen {
   id         Int             @id @default(autoincrement())
   almacenId  Int
   varianteId Int
+  ventaId    Int?            // FK opcional — presente cuando viene de una Nota de Venta
   cantidad   Int
   tipo       TipoMovRegistro
+  devuelto   Boolean         @default(false)
   notas      String?
   creadoPor  Int
   creadoEn   DateTime        @default(now())
 
   almacen  Almacen  @relation(fields: [almacenId], references: [id])
   variante Variante @relation(fields: [varianteId], references: [id])
+  venta    Venta?   @relation(fields: [ventaId], references: [id])
   usuario  Usuario  @relation(fields: [creadoPor], references: [id])
 
   @@map("registros_almacen")
 }
 
 // Cuaderno del JEFE_VENTA
-// Entrada manual: selecciona producto + cantidad
-// No requiere Nota de Venta vinculada — es un apunte libre
+// Entrada manual: selecciona producto + cantidad.
+// devuelto: true → la entrada fue anulada; la sincronización la omite.
 model RegistroTienda {
   id         Int             @id @default(autoincrement())
   almacenId  Int
   varianteId Int
   cantidad   Int
   tipo       TipoMovRegistro
+  devuelto   Boolean         @default(false)
   notas      String?
   creadoPor  Int
   creadoEn   DateTime        @default(now())

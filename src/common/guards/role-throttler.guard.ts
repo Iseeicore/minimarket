@@ -18,11 +18,15 @@ export class RoleThrottlerGuard extends ThrottlerGuard {
     const { name } = requestProps.throttler;
 
     // ALMACENERO: 300 req / 3 min — atiende el mostrador, pide muchas peticiones seguidas
-    if (name === 'almacenero' && rol !== 'ALMACENERO') return true;
+    if (name === 'almacenero'   && rol !== 'ALMACENERO')   return true;
     // ADMIN: 100 req / 3 min — uso administrativo, menos frecuencia
-    if (name === 'admin' && rol !== 'ADMIN') return true;
+    if (name === 'admin'        && rol !== 'ADMIN')        return true;
+    // JEFE_VENTA: 200 req / 3 min — tienda activa con registro frecuente
+    if (name === 'jefe_venta'   && rol !== 'JEFE_VENTA')   return true;
+    // JEFE_ALMACEN: 200 req / 3 min — almacén activo con notas de venta y registros
+    if (name === 'jefe_almacen' && rol !== 'JEFE_ALMACEN') return true;
     // PUBLICO: 10 req / 1 min — solo aplica a login y register (sin JWT)
-    if (name === 'publico' && rol !== null) return true;
+    if (name === 'publico'      && rol !== null)            return true;
 
     return super.handleRequest(requestProps);
   }
