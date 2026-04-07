@@ -34,6 +34,14 @@ export class CajaController {
     return this.service.getActiva(almacenId, req.user.empresaId);
   }
 
+  @Get('estado/:almacenId')
+  @UseGuards(PermisosGuard)
+  @Permiso(ModuloApp.CAJA, 'leer')
+  @ApiOperation({ summary: 'Estado de caja del almacén: ABIERTA_HOY, ABIERTA_DIA_ANTERIOR, CERRADA' })
+  getEstado(@Param('almacenId', ParseIntPipe) almacenId: number, @Request() req: any) {
+    return this.service.getEstado(almacenId, req.user.empresaId);
+  }
+
   @Get(':id')
   @UseGuards(PermisosGuard)
   @Permiso(ModuloApp.CAJA, 'leer')
@@ -56,6 +64,14 @@ export class CajaController {
   @ApiOperation({ summary: 'Abrir nueva caja' })
   abrir(@Body() dto: AbrirCajaDto, @Request() req: any) {
     return this.service.abrir(dto, req.user.id, req.user.empresaId);
+  }
+
+  @Post('abrir-dia/:almacenId')
+  @UseGuards(PermisosGuard)
+  @Permiso(ModuloApp.CAJA, 'crear')
+  @ApiOperation({ summary: 'Pipeline: cerrar caja anterior si existe + abrir caja del día (idempotente)' })
+  abrirDia(@Param('almacenId', ParseIntPipe) almacenId: number, @Request() req: any) {
+    return this.service.abrirDia(almacenId, req.user.id, req.user.empresaId);
   }
 
   @Post(':id/cerrar')

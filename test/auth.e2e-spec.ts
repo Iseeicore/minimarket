@@ -8,7 +8,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 // Datos de prueba — identificadores unicos para no colisionar con datos reales
 // ---------------------------------------------------------------------------
 const TEST_EMAIL = 'e2e.admin@minimarket-test.local';
-const TEST_RUC   = '20000000001';
+const TEST_RUC   = '29999999998';
 const TEST_PASS  = 'TestPass123';
 
 const registerPayload = {
@@ -202,7 +202,26 @@ async function cleanupEmpresa(prisma: PrismaService): Promise<void> {
       await prisma.ordenCompra.deleteMany({ where: { id: { in: ordenIds } } });
     }
 
+    // Ordenes salida
+    const ordenesSalida = await prisma.ordenSalida.findMany({ where: { almacenId: { in: almacenIds } }, select: { id: true } });
+    if (ordenesSalida.length > 0) {
+      await prisma.ordenSalidaDetalle.deleteMany({ where: { ordenSalidaId: { in: ordenesSalida.map(o => o.id) } } });
+      await prisma.ordenSalida.deleteMany({ where: { almacenId: { in: almacenIds } } });
+    }
+
+    // Registros
+    await prisma.registroTienda.deleteMany({ where: { almacenId: { in: almacenIds } } });
+    await prisma.registroAlmacen.deleteMany({ where: { almacenId: { in: almacenIds } } });
+
+    // Sincronizacion
+    const sincs = await prisma.sincronizacion.findMany({ where: { almacenId: { in: almacenIds } }, select: { id: true } });
+    if (sincs.length > 0) {
+      await prisma.reconciliacionItem.deleteMany({ where: { sincronizacionId: { in: sincs.map(s => s.id) } } }).catch(() => {});
+      await prisma.sincronizacion.deleteMany({ where: { almacenId: { in: almacenIds } } });
+    }
+
     // Stock, movimientos y bitacora
+    await prisma.stockTienda.deleteMany({ where: { almacenId: { in: almacenIds } } });
     await prisma.stockAlmacen.deleteMany({ where: { almacenId: { in: almacenIds } } });
     await prisma.movimientoStock.deleteMany({ where: { almacenId: { in: almacenIds } } });
     await prisma.bitacora.deleteMany({ where: { almacenId: { in: almacenIds } } });
@@ -221,7 +240,13 @@ async function cleanupEmpresa(prisma: PrismaService): Promise<void> {
     await prisma.usuario.deleteMany({ where: { empresaId } });
   }
 
-  // Contactos
+  // Variantes, productos, categorías, contactos
+  const productos = await prisma.producto.findMany({ where: { empresaId }, select: { id: true } });
+  if (productos.length > 0) {
+    await prisma.variante.deleteMany({ where: { productoId: { in: productos.map(p => p.id) } } });
+    await prisma.producto.deleteMany({ where: { empresaId } });
+  }
+  await prisma.categoria.deleteMany({ where: { empresaId } });
   await prisma.contacto.deleteMany({ where: { empresaId } });
 
   // Empresa

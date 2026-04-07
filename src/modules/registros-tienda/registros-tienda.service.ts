@@ -32,8 +32,8 @@ export class RegistrosTiendaService {
       ...(desde || hasta
         ? {
             creadoEn: {
-              ...(desde && { gte: new Date(desde) }),
-              ...(hasta && { lte: new Date(hasta) }),
+              ...(desde && { gte: new Date(`${desde}T00:00:00-05:00`) }),
+              ...(hasta && { lte: new Date(`${hasta}T23:59:59.999-05:00`) }),
             },
           }
         : {}),
@@ -60,6 +60,94 @@ export class RegistrosTiendaService {
     });
     if (!registro) throw new NotFoundException(`RegistroTienda #${id} no encontrado`);
     return registro;
+  }
+
+  async conteoPorDia(almacenId: number, desde: string, hasta: string, empresaId: number) {
+    const almacen = await this.prisma.almacen.findFirst({
+      where: { id: almacenId, empresaId },
+    });
+    if (!almacen) throw new NotFoundException(`Almacen #${almacenId} no encontrado`);
+
+    const registros = await this.prisma.registroTienda.findMany({
+      where: {
+        almacenId,
+        devuelto: false,
+        creadoEn: {
+          gte: new Date(`${desde}T00:00:00-05:00`),
+          lte: new Date(`${hasta}T23:59:59.999-05:00`),
+        },
+      },
+      select: { creadoEn: true },
+    });
+
+    // Agrupar por fecha local Lima (UTC-5)
+    const conteo: Record<string, number> = {};
+    for (const r of registros) {
+      const fecha = new Date(r.creadoEn.getTime() - 5 * 60 * 60 * 1000)
+        .toISOString().slice(0, 10);
+      conteo[fecha] = (conteo[fecha] ?? 0) + 1;
+    }
+
+    return conteo;
+  }
+
+  /**
+   * Resumen consolidado por producto: agrupa registros por varianteId+tipo,
+   * suma cantidades. Para el slide del cuaderno.
+   */
+  async resumenDia(
+    almacenId: number,
+    fecha: string,
+    empresaId: number,
+    tipo?: string,
+    page = 1,
+    limit = 10,
+  ) {
+    const almacen = await this.prisma.almacen.findFirst({
+      where: { id: almacenId, empresaId },
+    });
+    if (!almacen) throw new NotFoundException(`Almacen #${almacenId} no encontrado`);
+
+    const desde = new Date(`${fecha}T00:00:00-05:00`);
+    const hasta = new Date(`${fecha}T23:59:59.999-05:00`);
+
+    const where: Prisma.RegistroTiendaWhereInput = {
+      almacenId,
+      devuelto: false,
+      creadoEn: { gte: desde, lte: hasta },
+      ...(tipo && { tipo: tipo as any }),
+    };
+
+    // Agrupar por varianteId, sumar cantidad
+    const grupos = await this.prisma.registroTienda.groupBy({
+      by: ['varianteId'],
+      where,
+      _sum: { cantidad: true },
+      orderBy: { _sum: { cantidad: 'desc' } },
+    });
+
+    const total = grupos.length;
+    const skip = (page - 1) * limit;
+    const paginado = grupos.slice(skip, skip + limit);
+
+    // Enriquecer con datos de variante + producto
+    const varianteIds = paginado.map((g) => g.varianteId);
+    const variantes = await this.prisma.variante.findMany({
+      where: { id: { in: varianteIds } },
+      include: {
+        producto: { select: { id: true, nombre: true } },
+        unidad: { select: { id: true, abreviatura: true } },
+      },
+    });
+    const mapaVar = new Map(variantes.map((v) => [v.id, v]));
+
+    const data = paginado.map((g) => ({
+      varianteId: g.varianteId,
+      totalCantidad: g._sum.cantidad ?? 0,
+      variante: mapaVar.get(g.varianteId),
+    }));
+
+    return paginate(data, total, page, limit);
   }
 
   async create(dto: CreateRegistroTiendaDto, usuarioId: number, empresaId: number) {

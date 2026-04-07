@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Get,
   Param,
   ParseIntPipe,
@@ -32,6 +33,34 @@ export class RegistrosTiendaController {
   @ApiOperation({ summary: 'Listar registros activos (excluye devueltos)' })
   findAll(@Query() filters: FilterRegistroTiendaDto, @Request() req: any) {
     return this.service.findAll(filters, req.user.empresaId);
+  }
+
+  @Get('resumen-dia')
+  @UseGuards(PermisosGuard)
+  @Permiso(ModuloApp.REGISTRO_TIENDA, 'leer')
+  @ApiOperation({ summary: 'Resumen consolidado por producto — agrupa y suma cantidades del día' })
+  resumenDia(
+    @Query('almacenId', ParseIntPipe) almacenId: number,
+    @Query('fecha') fecha: string,
+    @Query('tipo') tipo: string | undefined,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Request() req: any,
+  ) {
+    return this.service.resumenDia(almacenId, fecha, req.user.empresaId, tipo, page, limit);
+  }
+
+  @Get('conteo-por-dia')
+  @UseGuards(PermisosGuard)
+  @Permiso(ModuloApp.REGISTRO_TIENDA, 'leer')
+  @ApiOperation({ summary: 'Conteo de registros por día — para estantería del cuaderno' })
+  conteoPorDia(
+    @Query('almacenId', ParseIntPipe) almacenId: number,
+    @Query('desde') desde: string,
+    @Query('hasta') hasta: string,
+    @Request() req: any,
+  ) {
+    return this.service.conteoPorDia(almacenId, desde, hasta, req.user.empresaId);
   }
 
   @Get(':id')

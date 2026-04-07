@@ -30,6 +30,84 @@ export class StockService {
     return stock;
   }
 
+  /**
+   * Stock dual: combina StockAlmacen y StockTienda en una respuesta unificada.
+   * El frontend usa esto para mostrar: Almacén X | Tienda Y | Total Z
+   */
+  async findDual(almacenId: number, empresaId: number) {
+    // Inicio del día UTC (para filtrar órdenes de hoy)
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    const [stockAlmacen, stockTienda, salidasHoy, ingresosHoy] = await Promise.all([
+      this.prisma.stockAlmacen.findMany({
+        where: { almacenId, almacen: { empresaId } },
+        include: {
+          variante: {
+            include: {
+              producto: { select: { id: true, nombre: true } },
+              unidad: { select: { id: true, nombre: true, abreviatura: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.stockTienda.findMany({
+        where: { almacenId, almacen: { empresaId } },
+      }),
+      // Salidas del día: cuánto salió por variante (órdenes de hoy)
+      this.prisma.ordenSalidaDetalle.groupBy({
+        by: ['varianteId'],
+        where: {
+          ordenSalida: {
+            almacenId,
+            almacen: { empresaId },
+            creadoEn: { gte: hoy },
+          },
+        },
+        _sum: { cantidad: true },
+      }),
+      // Ingresos del día: compras + devoluciones de hoy
+      this.prisma.movimientoStock.groupBy({
+        by: ['varianteId'],
+        where: {
+          almacenId,
+          almacen: { empresaId },
+          tipo: { in: ['COMPRA_ENTRADA', 'DEVOLUCION_ENTRADA'] },
+          creadoEn: { gte: hoy },
+        },
+        _sum: { cantidad: true },
+      }),
+    ]);
+
+    // Indexar por varianteId para O(1) lookup
+    const tiendaMap   = new Map(stockTienda.map((s) => [s.varianteId, s.cantidad]));
+    const salidaMap   = new Map(salidasHoy.map((s) => [s.varianteId, s._sum.cantidad ?? 0]));
+    const ingresoMap  = new Map(ingresosHoy.map((s) => [s.varianteId, s._sum.cantidad ?? 0]));
+
+    return stockAlmacen.map((sa) => {
+      const tienda      = tiendaMap.get(sa.varianteId) ?? 0;
+      const total       = sa.cantidad + tienda;
+      const salidaHoy   = salidaMap.get(sa.varianteId) ?? 0;
+      const ingresoHoy  = ingresoMap.get(sa.varianteId) ?? 0;
+      // Stock real al inicio del día = actual + lo que salió - lo que entró
+      const inicioReal  = total + salidaHoy - ingresoHoy;
+      // Si hubo ingreso que supera el inicio, la barra se resetea (100%+)
+      const inicioHoy   = Math.max(inicioReal, 1);
+
+      return {
+        varianteId:  sa.varianteId,
+        almacen:     sa.cantidad,
+        tienda,
+        total,
+        inicioHoy,
+        salidaHoy,
+        ingresoHoy,
+        stockMinimo: sa.variante?.stockMinimo ?? 0,
+        variante:    sa.variante,
+      };
+    });
+  }
+
   findByAlmacen(almacenId: number, empresaId: number) {
     return this.prisma.stockAlmacen.findMany({
       where:   { almacenId, almacen: { empresaId } },

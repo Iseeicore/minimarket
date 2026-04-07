@@ -59,9 +59,11 @@ model Almacen {
 
   empresa           Empresa            @relation(fields: [empresaId], references: [id])
   stocks            StockAlmacen[]
+  stocksTienda      StockTienda[]
   cajas             Caja[]
   ventas            Venta[]
   ordenesCompra     OrdenCompra[]
+  ordenesSalida     OrdenSalida[]
   movimientosStock  MovimientoStock[]
   bitacora          Bitacora[]
   usuarios          Usuario[]
@@ -98,15 +100,17 @@ model Variante {
   stockMinimo Int     @default(0)
   activo      Boolean @default(true)
 
-  producto           Producto            @relation(fields: [productoId], references: [id])
-  unidad             UnidadMedida        @relation(fields: [unidadId], references: [id])
-  stocks             StockAlmacen[]
-  itemsCompra        ItemCompra[]
-  itemsVenta         ItemVenta[]
-  movimientosStock   MovimientoStock[]
-  registrosAlmacen   RegistroAlmacen[]
-  registrosTienda    RegistroTienda[]
-  reconciliaciones   ReconciliacionItem[]
+  producto              Producto              @relation(fields: [productoId], references: [id])
+  unidad                UnidadMedida          @relation(fields: [unidadId], references: [id])
+  stocks                StockAlmacen[]
+  stocksTienda          StockTienda[]
+  itemsCompra           ItemCompra[]
+  itemsVenta            ItemVenta[]
+  movimientosStock      MovimientoStock[]
+  registrosAlmacen      RegistroAlmacen[]
+  registrosTienda       RegistroTienda[]
+  reconciliaciones      ReconciliacionItem[]
+  ordenesSalidaDetalle  OrdenSalidaDetalle[]
 
   @@map("variantes")
 }
@@ -378,6 +382,7 @@ enum TipoMovStock {
   DEVOLUCION_ENTRADA
   AJUSTE
   TRANSFERENCIA_SALIDA
+  ORDEN_SALIDA
 }
 
 model MovimientoStock {
@@ -497,6 +502,73 @@ model RegistroTienda {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ÓRDENES DE SALIDA — Jefe tienda solicita productos de almacén
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum TipoOrden {
+  VENTA
+  TRANSFERENCIA
+}
+
+enum EstadoOrden {
+  PENDIENTE
+  COMPLETADA
+  CANCELADA
+}
+
+enum OrigenStock {
+  ALMACEN
+  TIENDA
+}
+
+model OrdenSalida {
+  id             Int         @id @default(autoincrement())
+  numero         Int         // secuencial por almacén — para el ticket
+  almacenId      Int
+  tipo           TipoOrden
+  estado         EstadoOrden @default(PENDIENTE)
+  totalProductos Int         @default(0)
+  totalUnidades  Int         @default(0)
+  solicitadoPor  Int
+  creadoEn       DateTime    @default(now())
+  completadoEn   DateTime?
+
+  almacen     Almacen              @relation(fields: [almacenId], references: [id])
+  solicitante Usuario              @relation(fields: [solicitadoPor], references: [id])
+  detalles    OrdenSalidaDetalle[]
+
+  @@map("ordenes_salida")
+}
+
+model OrdenSalidaDetalle {
+  id            Int         @id @default(autoincrement())
+  ordenSalidaId Int
+  varianteId    Int
+  cantidad      Int
+  origen        OrigenStock @default(ALMACEN)
+
+  ordenSalida OrdenSalida @relation(fields: [ordenSalidaId], references: [id])
+  variante    Variante    @relation(fields: [varianteId], references: [id])
+
+  @@map("ordenes_salida_detalle")
+}
+
+// Stock en tienda — paralelo a StockAlmacen
+// Cuando una OrdenSalida se completa: StockAlmacen -N, StockTienda +N
+model StockTienda {
+  id         Int @id @default(autoincrement())
+  almacenId  Int
+  varianteId Int
+  cantidad   Int @default(0)
+
+  almacen  Almacen  @relation(fields: [almacenId], references: [id])
+  variante Variante @relation(fields: [varianteId], references: [id])
+
+  @@unique([almacenId, varianteId])
+  @@map("stock_tienda")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SINCRONIZACIÓN Y RECONCILIACIÓN
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -590,6 +662,7 @@ enum ModuloApp {
   REGISTRO_ALMACEN
   REGISTRO_TIENDA
   SINCRONIZACION
+  ORDENES_SALIDA
 }
 
 model Usuario {
@@ -615,6 +688,7 @@ model Usuario {
   registrosTienda            RegistroTienda[]
   sincronizacionesEjecutadas Sincronizacion[]
   reconciliacionesResueltas  ReconciliacionItem[]
+  ordenesSalida              OrdenSalida[]
 
   @@map("usuarios")
 }

@@ -46,8 +46,8 @@ export const PERMISOS_DEFAULT: Partial<Record<RolUsuario, PermisoSet[]>> = {
   ],
 
   // ─── JEFE_VENTA ─────────────────────────────────────────────────────────────
-  // Responsable de tienda: anota en su cuaderno, consulta ventas del día,
-  // inicia y resuelve sincronizaciones. NO toca stock ni caja directamente.
+  // Responsable de tienda: crea órdenes de salida (venta/transferencia),
+  // consulta stock dual, ve su cuaderno (read-only, alimentado por órdenes).
   [RolUsuario.JEFE_VENTA]: [
     { modulo: ModuloApp.PRODUCTOS,        leer: true,  crear: false, editar: false, eliminar: false },
     { modulo: ModuloApp.VARIANTES,        leer: true,  crear: false, editar: false, eliminar: false },
@@ -56,6 +56,8 @@ export const PERMISOS_DEFAULT: Partial<Record<RolUsuario, PermisoSet[]>> = {
     { modulo: ModuloApp.DEVOLUCIONES,     leer: true,  crear: false, editar: false, eliminar: false },
     { modulo: ModuloApp.REGISTRO_TIENDA,  leer: true,  crear: true,  editar: true,  eliminar: false },
     { modulo: ModuloApp.SINCRONIZACION,   leer: true,  crear: true,  editar: true,  eliminar: false },
+    { modulo: ModuloApp.ORDENES_SALIDA,   leer: true,  crear: true,  editar: true,  eliminar: false },
+    { modulo: ModuloApp.CAJA,             leer: true,  crear: true,  editar: false, eliminar: false },
     { modulo: ModuloApp.DASHBOARD,        leer: true,  crear: false, editar: false, eliminar: false },
   ],
 

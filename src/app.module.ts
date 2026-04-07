@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { RoleThrottlerGuard } from './common/guards/role-throttler.guard';
 import { PrismaModule } from './prisma/prisma.module';
@@ -23,10 +24,13 @@ import { PermisosModule } from './modules/permisos/permisos.module';
 import { RegistrosAlmacenModule } from './modules/registros-almacen/registros-almacen.module';
 import { RegistrosTiendaModule } from './modules/registros-tienda/registros-tienda.module';
 import { SincronizacionModule } from './modules/sincronizacion/sincronizacion.module';
+import { OrdenesSalidaModule } from './modules/ordenes-salida/ordenes-salida.module';
+import { CargaMasivaModule } from './modules/carga-masiva/carga-masiva.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       { name: 'almacenero',   ttl: 180_000, limit: 300 }, // 300 req / 3 min — mostrador activo
       { name: 'admin',        ttl: 180_000, limit: 100 }, // 100 req / 3 min — uso administrativo
@@ -54,6 +58,8 @@ import { SincronizacionModule } from './modules/sincronizacion/sincronizacion.mo
     RegistrosAlmacenModule,
     RegistrosTiendaModule,
     SincronizacionModule,
+    OrdenesSalidaModule,
+    CargaMasivaModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: RoleThrottlerGuard },

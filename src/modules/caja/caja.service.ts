@@ -121,6 +121,81 @@ export class CajaService {
     });
   }
 
+  async getEstado(almacenId: number, empresaId: number) {
+    // 1. ¿Hay caja abierta?
+    const cajaAbierta = await this.prisma.caja.findFirst({
+      where: { almacenId, estado: EstadoCaja.ABIERTA, almacen: { empresaId } },
+      include: INCLUDE_CAJA,
+    });
+
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    if (cajaAbierta) {
+      const esDeHoy = new Date(cajaAbierta.abiertoEn) >= hoy;
+      return {
+        estado: esDeHoy ? 'ABIERTA_HOY' : 'ABIERTA_DIA_ANTERIOR',
+        caja: cajaAbierta,
+        requiereAccion: !esDeHoy,
+      };
+    }
+
+    // 2. No hay caja abierta — buscar la última cerrada
+    const ultimaCerrada = await this.prisma.caja.findFirst({
+      where: { almacenId, estado: EstadoCaja.CERRADA, almacen: { empresaId } },
+      include: INCLUDE_CAJA,
+      orderBy: { cerradoEn: 'desc' },
+    });
+
+    return {
+      estado: 'CERRADA',
+      caja: ultimaCerrada,
+      requiereAccion: true,
+    };
+  }
+
+  async abrirDia(almacenId: number, usuarioId: number, empresaId: number) {
+    // Verificar almacén
+    const almacen = await this.prisma.almacen.findFirst({
+      where: { id: almacenId, empresaId },
+    });
+    if (!almacen) throw new NotFoundException(`Almacen #${almacenId} no encontrado`);
+
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    // 1. ¿Ya hay caja abierta?
+    const cajaAbierta = await this.prisma.caja.findFirst({
+      where: { almacenId, estado: EstadoCaja.ABIERTA },
+      include: INCLUDE_CAJA,
+    });
+
+    if (cajaAbierta) {
+      const esDeHoy = new Date(cajaAbierta.abiertoEn) >= hoy;
+      if (esDeHoy) {
+        // Idempotente — ya está abierta hoy
+        return cajaAbierta;
+      }
+
+      // Caja de día anterior → cerrar forzosamente y abrir nueva
+      await this.prisma.caja.update({
+        where: { id: cajaAbierta.id },
+        data: { estado: EstadoCaja.CERRADA, montoCierre: 0, cerradoEn: new Date() },
+      });
+    }
+
+    // 2. Crear caja del día
+    return this.prisma.caja.create({
+      data: {
+        almacenId,
+        abiertoPor: usuarioId,
+        montoApertura: 0,
+        estado: EstadoCaja.ABIERTA,
+      },
+      include: INCLUDE_CAJA,
+    });
+  }
+
   async addMovimiento(cajaId: number, dto: CreateMovimientoCajaDto, empresaId: number) {
     const caja = await this.findOne(cajaId, empresaId);
     if (caja.estado !== EstadoCaja.ABIERTA) {

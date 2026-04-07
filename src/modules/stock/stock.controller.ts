@@ -29,6 +29,12 @@ export class StockController {
     return this.service.findMovimientos(pagination, req.user.empresaId, almacenId);
   }
 
+  @Get('dual/:almacenId')
+  @ApiOperation({ summary: 'Stock dual: almacen + tienda desglosados por variante' })
+  findDual(@Param('almacenId', ParseIntPipe) almacenId: number, @Request() req: any) {
+    return this.service.findDual(almacenId, req.user.empresaId);
+  }
+
   @Get('almacen/:almacenId')
   @ApiOperation({ summary: 'Stock de un almacén específico' })
   findByAlmacen(@Param('almacenId', ParseIntPipe) almacenId: number, @Request() req: any) {

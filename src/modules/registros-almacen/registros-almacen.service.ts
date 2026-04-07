@@ -37,8 +37,8 @@ export class RegistrosAlmacenService {
       ...(desde || hasta
         ? {
             creadoEn: {
-              ...(desde && { gte: new Date(desde) }),
-              ...(hasta && { lte: new Date(hasta) }),
+              ...(desde && { gte: new Date(`${desde}T00:00:00-05:00`) }),
+              ...(hasta && { lte: new Date(`${hasta}T23:59:59.999-05:00`) }),
             },
           }
         : {}),
