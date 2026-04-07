@@ -34,6 +34,17 @@ const CREATE_DTO = {
 // ---------------------------------------------------------------------------
 // Mock de PrismaService
 // ---------------------------------------------------------------------------
+const mockTx = {
+  usuario: {
+    create: jest.fn(),
+    update: jest.fn(),
+  },
+  permisoUsuario: {
+    deleteMany: jest.fn(),
+    createMany: jest.fn(),
+  },
+};
+
 const mockPrisma = {
   usuario: {
     findMany: jest.fn(),
@@ -42,6 +53,7 @@ const mockPrisma = {
     create: jest.fn(),
     update: jest.fn(),
   },
+  $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<any>) => cb(mockTx)),
 };
 
 // ---------------------------------------------------------------------------
@@ -106,13 +118,13 @@ describe('UsuariosService', () => {
     it('crea un usuario nuevo y retorna sus datos', async () => {
       mockPrisma.usuario.findUnique.mockResolvedValue(null);
       mockBcrypt.hash.mockResolvedValue('$2b$10$hashedpwd' as never);
-      mockPrisma.usuario.create.mockResolvedValue(MOCK_USUARIO);
+      mockTx.usuario.create.mockResolvedValue(MOCK_USUARIO);
 
       const result = await service.create(CREATE_DTO, 1);
 
       expect(result.email).toBe('juan@test.com');
       expect(mockBcrypt.hash).toHaveBeenCalledWith('password123', 10);
-      expect(mockPrisma.usuario.create).toHaveBeenCalledWith(
+      expect(mockTx.usuario.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             email: 'juan@test.com',
@@ -138,7 +150,7 @@ describe('UsuariosService', () => {
   describe('update', () => {
     it('actualiza datos del usuario sin tocar la contrasena si no se envia', async () => {
       mockPrisma.usuario.findFirst.mockResolvedValue(MOCK_USUARIO);
-      mockPrisma.usuario.update.mockResolvedValue({ ...MOCK_USUARIO, nombre: 'Juan Actualizado' });
+      mockTx.usuario.update.mockResolvedValue({ ...MOCK_USUARIO, nombre: 'Juan Actualizado' });
 
       const result = await service.update(2, { nombre: 'Juan Actualizado' }, 1);
 
@@ -149,12 +161,12 @@ describe('UsuariosService', () => {
     it('hashea la nueva contrasena cuando se envia en el DTO', async () => {
       mockPrisma.usuario.findFirst.mockResolvedValue(MOCK_USUARIO);
       mockBcrypt.hash.mockResolvedValue('$2b$10$newhash' as never);
-      mockPrisma.usuario.update.mockResolvedValue(MOCK_USUARIO);
+      mockTx.usuario.update.mockResolvedValue(MOCK_USUARIO);
 
       await service.update(2, { password: 'newpassword123' }, 1);
 
       expect(mockBcrypt.hash).toHaveBeenCalledWith('newpassword123', 10);
-      expect(mockPrisma.usuario.update).toHaveBeenCalledWith(
+      expect(mockTx.usuario.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ passwordHash: '$2b$10$newhash' }),
         }),
