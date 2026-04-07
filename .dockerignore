@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.env
+.env.*
+*.md
+test
+coverage
+.eslintrc*
+.prettierrc*
+docker-compose*
+Dockerfile

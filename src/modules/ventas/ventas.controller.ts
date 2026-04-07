@@ -37,8 +37,11 @@ export class VentasController {
   @UseGuards(PermisosGuard)
   @Permiso(ModuloApp.VENTAS, 'leer')
   @ApiOperation({ summary: 'Ventas del día actual (lista del día)' })
-  findHoy(@Request() req: any) {
-    return this.service.findHoy(req.user.empresaId);
+  findHoy(
+    @Query('almacenId') almacenId: string | undefined,
+    @Request() req: any,
+  ) {
+    return this.service.findHoy(req.user.empresaId, almacenId ? +almacenId : undefined);
   }
 
   @Get(':id')

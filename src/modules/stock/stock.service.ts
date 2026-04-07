@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { startOfDayLima } from '../../common/utils/timezone';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { paginate } from '../../common/utils/paginate';
 
@@ -35,9 +36,8 @@ export class StockService {
    * El frontend usa esto para mostrar: Almacén X | Tienda Y | Total Z
    */
   async findDual(almacenId: number, empresaId: number) {
-    // Inicio del día UTC (para filtrar órdenes de hoy)
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    // Inicio del día Lima (para filtrar órdenes de hoy)
+    const hoy = startOfDayLima();
 
     const [stockAlmacen, stockTienda, salidasHoy, ingresosHoy] = await Promise.all([
       this.prisma.stockAlmacen.findMany({

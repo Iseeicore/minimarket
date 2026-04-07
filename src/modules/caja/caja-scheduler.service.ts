@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { EstadoCaja } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { startOfDayLima, endOfDayLima, toDateLima } from '../../common/utils/timezone';
 
 const TIMEZONE = 'America/Lima';
 
@@ -96,8 +97,7 @@ export class CajaSchedulerService implements OnModuleInit {
     });
 
     if (cajaAbierta) {
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
+      const hoy = startOfDayLima();
       const abiertoFecha = new Date(cajaAbierta.abiertoEn);
 
       if (abiertoFecha >= hoy) {
@@ -157,11 +157,10 @@ export class CajaSchedulerService implements OnModuleInit {
     }
 
     // Calcular resumen del día (misma lógica que cerrar() manual)
-    const inicio = new Date(caja.abiertoEn);
-    inicio.setHours(0, 0, 0, 0);
-    const fin = new Date();
-    fin.setHours(23, 59, 59, 999);
-    const fechaDia = new Date(inicio);
+    const fechaLima = toDateLima(new Date(caja.abiertoEn));
+    const inicio    = startOfDayLima(fechaLima);
+    const fin       = endOfDayLima(fechaLima);
+    const fechaDia  = inicio;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.caja.update({

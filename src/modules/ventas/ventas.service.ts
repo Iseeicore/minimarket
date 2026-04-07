@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { startOfDayLima, endOfDayLima } from '../../common/utils/timezone';
 import {
   EstadoCaja,
   EstadoVenta,
@@ -58,8 +59,8 @@ export class VentasService {
       ...(desde || hasta
         ? {
             creadoEn: {
-              ...(desde && { gte: new Date(desde) }),
-              ...(hasta && { lte: new Date(hasta) }),
+              ...(desde && { gte: new Date(`${desde}T00:00:00-05:00`) }),
+              ...(hasta && { lte: new Date(`${hasta}T23:59:59.999-05:00`) }),
             },
           }
         : {}),
@@ -79,15 +80,14 @@ export class VentasService {
     return paginate(data, total, page, limit);
   }
 
-  async findHoy(empresaId: number) {
-    const inicio = new Date();
-    inicio.setHours(0, 0, 0, 0);
-    const fin = new Date();
-    fin.setHours(23, 59, 59, 999);
+  async findHoy(empresaId: number, almacenId?: number) {
+    const inicio = startOfDayLima();
+    const fin    = endOfDayLima();
 
     return this.prisma.venta.findMany({
       where: {
         almacen: { empresaId },
+        ...(almacenId && { almacenId }),
         creadoEn: { gte: inicio, lte: fin },
         estado:   EstadoVenta.COMPLETADA,
       },

@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EstadoCaja, EstadoVenta, MetodoPago } from '@prisma/client';
+import { startOfDayLima, endOfDayLima, toDateLima } from '../../common/utils/timezone';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AbrirCajaDto } from './dto/abrir-caja.dto';
 import { CerrarCajaDto } from './dto/cerrar-caja.dto';
@@ -74,11 +75,10 @@ export class CajaService {
       throw new BadRequestException('La caja ya está cerrada');
     }
 
-    const inicio = new Date(caja.abiertoEn);
-    inicio.setHours(0, 0, 0, 0);
-    const fin = new Date();
-    fin.setHours(23, 59, 59, 999);
-    const fechaDia = new Date(inicio);
+    const fechaLima = toDateLima(new Date(caja.abiertoEn));
+    const inicio   = startOfDayLima(fechaLima);
+    const fin      = endOfDayLima(fechaLima);
+    const fechaDia = inicio;
 
     return this.prisma.$transaction(async (tx) => {
       const cajaCerrada = await tx.caja.update({
@@ -128,8 +128,7 @@ export class CajaService {
       include: INCLUDE_CAJA,
     });
 
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    const hoy = startOfDayLima();
 
     if (cajaAbierta) {
       const esDeHoy = new Date(cajaAbierta.abiertoEn) >= hoy;

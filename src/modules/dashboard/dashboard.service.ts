@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { EstadoVenta } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { startOfDayLima, endOfDayLima, todayLima, toDateLima } from '../../common/utils/timezone';
 
 @Injectable()
 export class DashboardService {
@@ -18,18 +19,18 @@ export class DashboardService {
   }
 
   async getVentasSemana(empresaId: number) {
-    const hace6Dias = new Date();
-    hace6Dias.setDate(hace6Dias.getDate() - 6);
-    hace6Dias.setHours(0, 0, 0, 0);
+    const hoyStr = todayLima();
+    const hoyInicio = startOfDayLima(hoyStr);
 
-    const hoyInicio = new Date();
-    hoyInicio.setHours(0, 0, 0, 0);
+    // Hace 6 días en Lima
+    const d6 = new Date(hoyInicio.getTime() - 6 * 24 * 60 * 60 * 1000);
+    const hace6Str = toDateLima(d6);
+    const hace6Dias = startOfDayLima(hace6Str);
 
     const porDia: Record<string, { fecha: string; total: number; cantidad: number }> = {};
     for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
+      const d = new Date(hoyInicio.getTime() - i * 24 * 60 * 60 * 1000);
+      const key = toDateLima(d);
       porDia[key] = { fecha: key, total: 0, cantidad: 0 };
     }
 
@@ -42,7 +43,7 @@ export class DashboardService {
     });
 
     for (const r of resumenes) {
-      const key = new Date(r.fecha).toISOString().slice(0, 10);
+      const key = toDateLima(new Date(r.fecha));
       if (porDia[key]) {
         porDia[key].total    += Number(r.montoTotal);
         porDia[key].cantidad += r.totalVentas;
@@ -50,8 +51,7 @@ export class DashboardService {
     }
 
     // Hoy: query live (la caja puede estar aún abierta)
-    const finHoy = new Date();
-    finHoy.setHours(23, 59, 59, 999);
+    const finHoy = endOfDayLima(hoyStr);
 
     const ventasHoy = await this.prisma.venta.aggregate({
       where: {
@@ -63,17 +63,16 @@ export class DashboardService {
       _count: { id: true },
     });
 
-    const todayKey = new Date().toISOString().slice(0, 10);
-    porDia[todayKey].total    = Number(ventasHoy._sum.total ?? 0);
-    porDia[todayKey].cantidad = ventasHoy._count.id;
+    porDia[hoyStr].total    = Number(ventasHoy._sum.total ?? 0);
+    porDia[hoyStr].cantidad = ventasHoy._count.id;
 
     return Object.values(porDia);
   }
 
   async getListaDia(empresaId: number, fecha?: string) {
-    const base   = fecha ? new Date(fecha) : new Date();
-    const inicio = new Date(base); inicio.setHours(0, 0, 0, 0);
-    const fin    = new Date(base); fin.setHours(23, 59, 59, 999);
+    const dia    = fecha ?? todayLima();
+    const inicio = startOfDayLima(dia);
+    const fin    = endOfDayLima(dia);
 
     const items = await this.prisma.itemVenta.findMany({
       where: {
@@ -121,9 +120,9 @@ export class DashboardService {
   }
 
   async getListaDiaCruda(empresaId: number, fecha?: string) {
-    const base   = fecha ? new Date(fecha) : new Date();
-    const inicio = new Date(base); inicio.setHours(0, 0, 0, 0);
-    const fin    = new Date(base); fin.setHours(23, 59, 59, 999);
+    const dia    = fecha ?? todayLima();
+    const inicio = startOfDayLima(dia);
+    const fin    = endOfDayLima(dia);
 
     const items = await this.prisma.itemVenta.findMany({
       where: {
@@ -207,9 +206,8 @@ export class DashboardService {
   }
 
   async getTopVariantes(empresaId: number) {
-    const inicioMes = new Date();
-    inicioMes.setDate(1);
-    inicioMes.setHours(0, 0, 0, 0);
+    const hoyLima = todayLima(); // 'YYYY-MM-DD'
+    const inicioMes = startOfDayLima(`${hoyLima.slice(0, 8)}01`);
 
     const items = await this.prisma.itemVenta.groupBy({
       by: ['varianteId'],
