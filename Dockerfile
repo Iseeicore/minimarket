@@ -42,15 +42,8 @@ RUN npm install --legacy-peer-deps --omit=dev
 # Generate Prisma Client with prod deps
 RUN npx prisma generate
 
-# Remove Prisma Studio + React (not needed at runtime)
-# Keep prisma CLI for migrate deploy at startup
-RUN rm -rf node_modules/@prisma/studio-core \
-           node_modules/@prisma/studio-pcw \
-           node_modules/@radix-ui \
-           node_modules/react \
-           node_modules/react-dom \
-           node_modules/scheduler \
-           node_modules/@types/react \
+# Clean up non-essential files (keep prisma CLI + studio intact — CLI needs studio at runtime)
+RUN rm -rf node_modules/@types/react \
            node_modules/@types/react-dom \
            node_modules/.package-lock.json
 
