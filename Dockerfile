@@ -1,66 +1,40 @@
 # ══════════════════════════════════════════════════════════════════════════════
 # MiniMarket API — Multi-stage Docker build
 # NestJS + Prisma 7 (PrismaPg adapter) + PostgreSQL
-#
-# Prisma 7 carga prisma.config.ts con su propio TS loader nativo.
-# No necesita ts-node ni compilar a JS.
 # ══════════════════════════════════════════════════════════════════════════════
 
-# ── Stage 1: Dependencies ────────────────────────────────────────────────────
-FROM node:22-alpine AS deps
-
+# ── Stage 1: Build ───────────────────────────────────────────────────────────
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-COPY prisma ./prisma/
-COPY prisma.config.ts ./
-
 RUN npm install --legacy-peer-deps
+
+COPY . .
 RUN npx prisma generate
-
-# ── Stage 2: Build ───────────────────────────────────────────────────────────
-FROM node:22-alpine AS build
-
-WORKDIR /app
-
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/prisma ./prisma
-COPY package.json tsconfig.json tsconfig.build.json nest-cli.json ./
-COPY prisma.config.ts ./
-COPY src ./src
-
 RUN npm run build
 
-# ── Stage 3: Production dependencies only ────────────────────────────────────
-FROM node:22-alpine AS prod-deps
-
+# ── Stage 2: Runtime ─────────────────────────────────────────────────────────
+FROM node:22-alpine AS runner
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-COPY prisma ./prisma/
-COPY prisma.config.ts ./
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-RUN npm install --legacy-peer-deps --omit=dev
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/package-lock.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./
+
+# Eliminar devDeps
+RUN npm prune --omit=dev
 RUN npx prisma generate
 
-RUN rm -rf node_modules/@types/react \
-           node_modules/@types/react-dom \
-           node_modules/.package-lock.json
+# wget para HEALTHCHECK
+RUN apk add --no-cache wget
 
-# ── Stage 4: Final image ────────────────────────────────────────────────────
-FROM node:22-alpine AS production
-
-WORKDIR /app
-
-RUN addgroup -g 1001 -S appgroup && \
-    adduser -S appuser -u 1001 -G appgroup
-
-# Copy runtime files
-COPY --from=prod-deps /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/prisma ./prisma
-COPY prisma.config.ts ./
-COPY package.json ./
+# Código compilado
+COPY --from=builder /app/dist ./dist
 
 USER appuser
 
@@ -69,7 +43,8 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:3000/api/docs || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD wget --no-verbose --tries=1 -O /dev/null http://localhost:3000/api/docs || exit 1
 
-CMD ["node", "dist/main.js"]
+# Migraciones antes de levantar — exec reemplaza sh con node (PID 1)
+ENTRYPOINT ["/bin/sh", "-c", "echo DATABASE_URL=$DATABASE_URL | head -c 40 && echo '...' && npx prisma migrate deploy && exec node dist/main.js"]
