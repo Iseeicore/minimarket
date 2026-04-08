@@ -42,9 +42,9 @@ RUN npm install --legacy-peer-deps --omit=dev
 # Generate Prisma Client with prod deps
 RUN npx prisma generate
 
-# Remove Prisma CLI + Studio (not needed at runtime, saves ~200 MB)
-RUN rm -rf node_modules/prisma \
-           node_modules/@prisma/studio-core \
+# Remove Prisma Studio + React (not needed at runtime)
+# Keep prisma CLI for migrate deploy at startup
+RUN rm -rf node_modules/@prisma/studio-core \
            node_modules/@prisma/studio-pcw \
            node_modules/@radix-ui \
            node_modules/react \
@@ -66,6 +66,7 @@ RUN addgroup -g 1001 -S appgroup && \
 # Copy only what's needed for runtime
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/prisma ./prisma
 COPY package.json ./
 
 # Switch to non-root
