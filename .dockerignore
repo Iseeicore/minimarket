@@ -1,5 +1,4 @@
 node_modules
-dist
 .git
 .env
 .env.*
@@ -9,4 +8,3 @@ coverage
 .eslintrc*
 .prettierrc*
 docker-compose*
-Dockerfile

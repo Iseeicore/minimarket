@@ -46,6 +46,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD wget --no-verbose --tries=1 -O /dev/null http://localhost:3000/api/docs || exit 1
 
-# Migraciones antes de levantar — exec reemplaza sh con node (PID 1)
-ENTRYPOINT ["/bin/sh", "-c", "echo DATABASE_URL=$DATABASE_URL | head -c 40 && echo '...' && npx prisma migrate deploy && exec node dist/main.js"]
+# Debug: verificar que dist existe, migrar, arrancar
+ENTRYPOINT ["/bin/sh", "-c", "echo DATABASE_URL=$DATABASE_URL | head -c 40 && echo '...' && echo '=== ls /app/dist ===' && ls -la /app/dist/ && npx prisma migrate deploy && exec node dist/main.js"]
 # cache-bust: 1775615166
