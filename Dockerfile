@@ -1,8 +1,9 @@
 # ══════════════════════════════════════════════════════════════════════════════
-# MiniMarket API — Multi-stage Docker build (optimized)
+# MiniMarket API — Multi-stage Docker build
 # NestJS + Prisma 7 (PrismaPg adapter) + PostgreSQL
 #
-# Imagen final: ~300 MB (vs 1 GB sin optimizar)
+# Prisma 7: url NO va en schema.prisma, va en prisma.config.ts
+# En producción: compilamos prisma.config.ts → prisma.config.js
 # ══════════════════════════════════════════════════════════════════════════════
 
 # ── Stage 1: Dependencies ────────────────────────────────────────────────────
@@ -12,6 +13,7 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 COPY prisma ./prisma/
+COPY prisma.config.ts ./
 
 RUN npm install --legacy-peer-deps
 RUN npx prisma generate
@@ -24,9 +26,15 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/prisma ./prisma
 COPY package.json tsconfig.json tsconfig.build.json nest-cli.json ./
+COPY prisma.config.ts ./
 COPY src ./src
 
+# Build NestJS app
 RUN npm run build
+
+# Compile prisma.config.ts → prisma.config.js for production
+RUN npx tsc prisma.config.ts --esModuleInterop --module commonjs --outDir /tmp/prisma-config \
+    && cp /tmp/prisma-config/prisma.config.js ./prisma.config.js
 
 # ── Stage 3: Production dependencies only ────────────────────────────────────
 FROM node:22-alpine AS prod-deps
@@ -35,14 +43,11 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 COPY prisma ./prisma/
+COPY prisma.config.ts ./
 
-# Install ONLY production dependencies
 RUN npm install --legacy-peer-deps --omit=dev
-
-# Generate Prisma Client with prod deps
 RUN npx prisma generate
 
-# Clean up non-essential files (keep prisma CLI + studio intact — CLI needs studio at runtime)
 RUN rm -rf node_modules/@types/react \
            node_modules/@types/react-dom \
            node_modules/.package-lock.json
@@ -52,17 +57,16 @@ FROM node:22-alpine AS production
 
 WORKDIR /app
 
-# Security: non-root user
 RUN addgroup -g 1001 -S appgroup && \
     adduser -S appuser -u 1001 -G appgroup
 
-# Copy only what's needed for runtime
+# Copy runtime files
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/prisma.config.js ./prisma.config.js
 COPY package.json ./
 
-# Switch to non-root
 USER appuser
 
 ENV NODE_ENV=production
