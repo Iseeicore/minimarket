@@ -48,3 +48,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 # Migraciones antes de levantar — exec reemplaza sh con node (PID 1)
 ENTRYPOINT ["/bin/sh", "-c", "echo DATABASE_URL=$DATABASE_URL | head -c 40 && echo '...' && npx prisma migrate deploy && exec node dist/main.js"]
+# cache-bust: 1775615166
