@@ -8,7 +8,8 @@ let varianteId1: number;
 let varianteId2: number;
 let registroIds: number[] = [];
 
-const TODAY = new Date().toISOString().slice(0, 10);
+import { todayLima } from '../src/common/utils/timezone';
+const TODAY = todayLima();
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -361,7 +362,7 @@ describe('RegistrosTienda (e2e)', () => {
 
     it('GET /registros-tienda/conteo-por-dia — rango de varios días refleja conteo correcto', async () => {
       const { jefeVentaToken, almacenId } = getCtx();
-      const ayer = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      const ayer = (() => { const d = new Date(Date.now() - 86400000 - 5*60*60*1000); return d.toISOString().slice(0, 10); })();
       const { status, body } = await get(
         `/registros-tienda/conteo-por-dia?almacenId=${almacenId}&desde=${ayer}&hasta=${TODAY}`,
         jefeVentaToken,

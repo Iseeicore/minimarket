@@ -1,9 +1,11 @@
 import { setupTestEnv, teardownTestEnv, getCtx, get, post, patch, noAuth } from './helpers/setup';
 
+import { todayLima } from '../src/common/utils/timezone';
+
 // ── Helpers locales ───────────────────────────────────────────────────────────
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayLima();
 }
 
 // ── Suite ─────────────────────────────────────────────────────────────────────
