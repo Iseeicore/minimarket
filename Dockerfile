@@ -2,8 +2,8 @@
 # MiniMarket API — Multi-stage Docker build
 # NestJS + Prisma 7 (PrismaPg adapter) + PostgreSQL
 #
-# Prisma 7: url NO va en schema.prisma, va en prisma.config.ts
-# En producción: compilamos prisma.config.ts → prisma.config.js
+# Prisma 7 carga prisma.config.ts con su propio TS loader nativo.
+# No necesita ts-node ni compilar a JS.
 # ══════════════════════════════════════════════════════════════════════════════
 
 # ── Stage 1: Dependencies ────────────────────────────────────────────────────
@@ -29,12 +29,7 @@ COPY package.json tsconfig.json tsconfig.build.json nest-cli.json ./
 COPY prisma.config.ts ./
 COPY src ./src
 
-# Build NestJS app
 RUN npm run build
-
-# Compile prisma.config.ts → prisma.config.js for production
-RUN npx tsc prisma.config.ts --esModuleInterop --module commonjs --outDir /tmp/prisma-config \
-    && cp /tmp/prisma-config/prisma.config.js ./prisma.config.js
 
 # ── Stage 3: Production dependencies only ────────────────────────────────────
 FROM node:22-alpine AS prod-deps
@@ -64,7 +59,7 @@ RUN addgroup -g 1001 -S appgroup && \
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
-COPY --from=build /app/prisma.config.js ./prisma.config.js
+COPY prisma.config.ts ./
 COPY package.json ./
 
 USER appuser
